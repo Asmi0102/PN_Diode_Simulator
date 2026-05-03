@@ -1,0 +1,1562 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+
+<!--
+  PN-Sim v2.0 | index.html
+  PN Junction Diode Simulator
+  Developer : Asmita Yadav | RA2511003050539 | CSE-H 1st Year
+
+  External dependencies (CDN — no local installs required):
+    • Tailwind CSS v3     — utility-first styling
+    • Chart.js v4.4.0     — I-V curve rendering
+    • Google Fonts        — Space Grotesk + Inter + Material Symbols
+
+  Local files:
+    • styles.css          — custom CSS (glass panels, sliders, modal, print)
+    • script.js           — simulator engine (defer loaded after DOM parse)
+
+  Deployment:
+    Static files only — no build step, no backend.
+    Drop the /pnsim folder on Vercel and it works immediately.
+-->
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="PN Junction Diode Simulator — interactive I-V characteristics tool for semiconductor analysis.">
+    <title>PN-Sim v2.0 | PN Junction Diode Simulator</title>
+
+    <!-- ── Google Fonts ──────────────────────────────────────────────────── -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet">
+
+    <!-- ── Tailwind CSS (CDN with custom theme config) ───────────────────── -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+
+    <!-- ── Chart.js (CDN — used by script.js for I-V curve) ─────────────── -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <!-- ── Custom styles ────────────────────────────────────────────────── -->
+    <link rel="stylesheet" href="styles.css">
+
+    <!-- ── Tailwind custom theme (must run before body renders) ─────────── -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        'on-primary-fixed':          '#001f24',
+                        'secondary':                 '#dab9ff',
+                        'surface-tint':              '#00daf3',
+                        'on-primary':                '#00363d',
+                        'primary-fixed-dim':         '#00daf3',
+                        'on-secondary':              '#460283',
+                        'surface-container':         '#201f1f',
+                        'inverse-on-surface':        '#313030',
+                        'error-container':           '#93000a',
+                        'outline-variant':           '#3b494c',
+                        'on-primary-container':      '#00626e',
+                        'inverse-surface':           '#e5e2e1',
+                        'surface-bright':            '#393939',
+                        'inverse-primary':           '#006875',
+                        'on-background':             '#e5e2e1',
+                        'primary-container':         '#00e5ff',
+                        'surface-dim':               '#131313',
+                        'surface-container-lowest':  '#0e0e0e',
+                        'primary':                   '#c3f5ff',
+                        'primary-fixed':             '#9cf0ff',
+                        'error':                     '#ffb4ab',
+                        'on-secondary-fixed':        '#2a0053',
+                        'on-error-container':        '#ffdad6',
+                        'surface-container-high':    '#2a2a2a',
+                        'on-tertiary':               '#370096',
+                        'on-surface-variant':        '#bac9cc',
+                        'outline':                   '#849396',
+                        'on-secondary-container':    '#cfa7ff',
+                        'surface-container-highest': '#353534',
+                        'surface-container-low':     '#1c1b1b',
+                        'surface':                   '#131313',
+                        'on-surface':                '#e5e2e1',
+                        'on-error':                  '#690005',
+                        'background':                '#131313',
+                        'surface-variant':           '#353534',
+                        'secondary-container':       '#602b9d',
+                    },
+                    borderRadius: {
+                        DEFAULT: '0.125rem',
+                        lg:      '0.25rem',
+                        xl:      '0.5rem',
+                        full:    '0.75rem',
+                    },
+                    fontFamily: {
+                        'body-md':   ['Inter', 'sans-serif'],
+                        'body-lg':   ['Inter', 'sans-serif'],
+                        'label-caps':['Inter', 'sans-serif'],
+                        'mono-data': ['monospace'],
+                        'h1':        ['Space Grotesk', 'sans-serif'],
+                        'h2':        ['Space Grotesk', 'sans-serif'],
+                        'h3':        ['Space Grotesk', 'sans-serif'],
+                    },
+                    fontSize: {
+                        'body-md':    ['16px', { lineHeight: '1.5',   letterSpacing: '0',     fontWeight: '400' }],
+                        'label-caps': ['12px', { lineHeight: '1',     letterSpacing: '0.1em', fontWeight: '600' }],
+                        'body-lg':    ['18px', { lineHeight: '1.6',   letterSpacing: '0',     fontWeight: '400' }],
+                        'mono-data':  ['14px', { lineHeight: '1.4',   letterSpacing: '0',     fontWeight: '400' }],
+                        'h3':         ['24px', { lineHeight: '1.3',   letterSpacing: '0',     fontWeight: '500' }],
+                        'h2':         ['32px', { lineHeight: '1.2',   letterSpacing: '-0.01em', fontWeight: '600' }],
+                        'h1':         ['48px', { lineHeight: '1.1',   letterSpacing: '-0.02em', fontWeight: '700' }],
+                    },
+                },
+            },
+        };
+    </script>
+</head>
+
+<body class="bg-zinc-950 text-on-surface font-body-md selection:bg-cyan-500/30">
+
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         HEADER — Fixed top bar with branding, nav, reset & export buttons
+    ═══════════════════════════════════════════════════════════════════════════ -->
+    <header class="flex justify-between items-center px-6 h-16 w-full fixed z-50
+                   bg-zinc-950/80 backdrop-blur-md border-b border-white/10
+                   shadow-[0_0_15px_rgba(0,229,255,0.05)]">
+
+        <!-- Left: logo + nav links -->
+        <div class="flex items-center gap-4">
+            <!-- Hamburger: mobile only — opens the mobile sidebar drawer -->
+            <button id="mobileMenuBtn"
+                class="md:hidden text-zinc-400 hover:text-cyan-400 transition-colors"
+                aria-label="Open navigation menu">
+                <span class="material-symbols-outlined">menu</span>
+            </button>
+
+            <span class="text-xl font-bold text-cyan-400 tracking-tighter uppercase font-['Space_Grotesk']">
+                PN-Sim v2.0
+            </span>
+            <div class="h-4 w-px bg-white/20 hidden md:block"></div>
+            <nav class="hidden md:flex gap-6" aria-label="Main navigation">
+                <a class="text-cyan-400 border-b-2 border-cyan-400 pb-1 font-['Space_Grotesk'] text-sm tracking-tight"
+                    href="#">Simulator</a>
+                <a class="text-zinc-500 hover:text-zinc-200 transition-colors font-['Space_Grotesk'] text-sm tracking-tight"
+                    href="#">I-V Curves</a>
+                <!-- id="matLibraryNavLink" — opens the Material Library modal -->
+                <a id="matLibraryNavLink"
+                    class="text-zinc-500 hover:text-zinc-200 transition-colors font-['Space_Grotesk'] text-sm tracking-tight cursor-pointer"
+                    href="#" role="button">Material Library</a>
+                <a class="text-zinc-500 hover:text-zinc-200 transition-colors font-['Space_Grotesk'] text-sm tracking-tight"
+                    href="#">Reports</a>
+            </nav>
+        </div>
+
+        <!-- Right: action buttons — scales down gracefully on mobile -->
+        <div class="flex items-center gap-1 sm:gap-3">
+            <!-- Notifications: icon only, hidden on xs to save space -->
+            <button class="hidden sm:inline-flex text-zinc-400 hover:text-cyan-400 transition-colors duration-200"
+                    aria-label="Notifications">
+                <span class="material-symbols-outlined">notifications</span>
+            </button>
+            <!-- Settings: icon only, hidden on xs -->
+            <button class="hidden sm:inline-flex text-zinc-400 hover:text-cyan-400 transition-colors duration-200"
+                    aria-label="Settings">
+                <span class="material-symbols-outlined">settings</span>
+            </button>
+
+            <!-- Reset: text hidden on tiny screens, shows icon only -->
+            <button id="resetBtn"
+                class="flex items-center gap-1 bg-cyan-500/10 text-cyan-400 border border-cyan-500/20
+                       px-2 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-medium
+                       hover:bg-cyan-500/20 transition-all active:scale-95">
+                <span class="material-symbols-outlined sm:hidden" style="font-size:18px;">restart_alt</span>
+                <span class="hidden sm:inline">Reset</span>
+            </button>
+
+            <!-- Export Data: icon-only on xs, full label on sm+ -->
+            <button id="exportDataBtn"
+                class="flex items-center gap-1 bg-primary-container text-on-primary-fixed
+                       px-2 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-bold
+                       hover:brightness-110 transition-all active:scale-95 shadow-lg shadow-cyan-500/20">
+                <span class="material-symbols-outlined sm:hidden" style="font-size:18px;">download</span>
+                <span class="hidden sm:inline">Export Data</span>
+            </button>
+        </div>
+    </header>
+
+
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         SIDEBAR — Fixed left navigation panel
+    ═══════════════════════════════════════════════════════════════════════════ -->
+    <aside class="hidden md:flex flex-col pt-4 pb-8 fixed left-0 top-16 z-40
+                  h-[calc(100vh-64px)] w-64 border-r border-white/10
+                  bg-zinc-950/40 backdrop-blur-xl shadow-2xl"
+           aria-label="Sidebar navigation">
+
+        <!-- Developer name + subtitle -->
+        <div class="px-6 mb-8">
+            <h2 class="text-white font-h3 text-lg font-bold tracking-tight">Asmita Yadav</h2>
+            <p class="text-zinc-500 text-xs font-mono-data tracking-widest uppercase mt-1">
+                Semiconductor Simulation
+            </p>
+        </div>
+
+        <!-- Nav items -->
+        <nav class="flex flex-col gap-1" aria-label="Sidebar links">
+            <a class="bg-cyan-500/10 text-cyan-400 border-r-4 border-cyan-400 font-bold
+                      px-6 py-3 flex items-center gap-3 transition-all duration-150"
+                href="#" aria-current="page">
+                <span class="material-symbols-outlined">memory</span>
+                <span class="font-['Space_Grotesk'] text-sm">Device Setup</span>
+            </a>
+            <a class="text-zinc-400 px-6 py-3 flex items-center gap-3 hover:bg-white/5 transition-all duration-150"
+                href="#">
+                <span class="material-symbols-outlined">waves</span>
+                <span class="font-['Space_Grotesk'] text-sm">Carrier Dynamics</span>
+            </a>
+            <a class="text-zinc-400 px-6 py-3 flex items-center gap-3 hover:bg-white/5 transition-all duration-150"
+                href="#">
+                <span class="material-symbols-outlined">bolt</span>
+                <span class="font-['Space_Grotesk'] text-sm">Voltage Control</span>
+            </a>
+            <a class="text-zinc-400 px-6 py-3 flex items-center gap-3 hover:bg-white/5 transition-all duration-150"
+                href="#">
+                <span class="material-symbols-outlined">thermostat</span>
+                <span class="font-['Space_Grotesk'] text-sm">Thermal Analysis</span>
+            </a>
+            <a class="text-zinc-400 px-6 py-3 flex items-center gap-3 hover:bg-white/5 transition-all duration-150"
+                href="#">
+                <span class="material-symbols-outlined">cloud_upload</span>
+                <span class="font-['Space_Grotesk'] text-sm">Cloud Sync</span>
+            </a>
+        </nav>
+
+        <!-- Bottom actions -->
+        <div class="mt-auto px-6 space-y-2">
+            <button class="w-full py-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10
+                           text-zinc-300 font-medium transition-all flex items-center justify-center gap-2">
+                <span class="material-symbols-outlined text-sm">add</span>
+                New Experiment
+            </button>
+
+            <div class="pt-6 border-t border-white/5 space-y-3">
+                <!-- Documentation link: opens slide-in modal — wired in script.js -->
+                <a id="docLink"
+                    class="flex items-center gap-3 text-zinc-500 hover:text-zinc-300
+                           text-xs uppercase tracking-widest transition-colors cursor-pointer"
+                    href="#" role="button" aria-haspopup="dialog">
+                    <span class="material-symbols-outlined text-sm">menu_book</span>
+                    Documentation
+                </a>
+            </div>
+        </div>
+    </aside>
+
+
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         MOBILE SIDEBAR — Slide-in drawer (visible only on small screens)
+         Toggled by #mobileMenuBtn in the header.
+    ═══════════════════════════════════════════════════════════════════════════ -->
+
+    <!-- Dark backdrop behind the panel -->
+    <div id="mobileSidebarOverlay"
+         class="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm md:hidden"
+         aria-hidden="true"></div>
+
+    <!-- Slide-in panel -->
+    <aside id="mobileSidebar"
+           class="fixed left-0 top-0 h-full w-72 z-[70] flex flex-col pt-4 pb-8
+                  bg-zinc-950 border-r border-white/10 shadow-2xl md:hidden"
+           aria-label="Mobile navigation">
+
+        <!-- Panel header: branding + close button -->
+        <div class="flex items-center justify-between px-6 mb-8">
+            <div>
+                <span class="text-cyan-400 font-bold text-lg tracking-tighter uppercase font-['Space_Grotesk']">
+                    PN-Sim v2.0
+                </span>
+                <p class="text-zinc-500 text-xs font-mono-data tracking-widest uppercase mt-0.5">
+                    Asmita Yadav
+                </p>
+            </div>
+            <button id="closeMobileSidebar"
+                class="text-zinc-500 hover:text-white transition-colors p-1 hover:bg-white/5 rounded-lg"
+                aria-label="Close navigation menu">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+
+        <!-- Nav links — mirrors desktop sidebar -->
+        <nav class="flex flex-col gap-1" aria-label="Mobile sidebar links">
+            <a class="bg-cyan-500/10 text-cyan-400 border-r-4 border-cyan-400 font-bold
+                      px-6 py-3 flex items-center gap-3 transition-all duration-150"
+                href="#" aria-current="page">
+                <span class="material-symbols-outlined">memory</span>
+                <span class="font-['Space_Grotesk'] text-sm">Device Setup</span>
+            </a>
+            <a class="text-zinc-400 px-6 py-3 flex items-center gap-3 hover:bg-white/5 transition-all duration-150"
+                href="#">
+                <span class="material-symbols-outlined">waves</span>
+                <span class="font-['Space_Grotesk'] text-sm">Carrier Dynamics</span>
+            </a>
+            <a class="text-zinc-400 px-6 py-3 flex items-center gap-3 hover:bg-white/5 transition-all duration-150"
+                href="#">
+                <span class="material-symbols-outlined">bolt</span>
+                <span class="font-['Space_Grotesk'] text-sm">Voltage Control</span>
+            </a>
+            <a class="text-zinc-400 px-6 py-3 flex items-center gap-3 hover:bg-white/5 transition-all duration-150"
+                href="#">
+                <span class="material-symbols-outlined">thermostat</span>
+                <span class="font-['Space_Grotesk'] text-sm">Thermal Analysis</span>
+            </a>
+            <!-- Material Library link — opens Material Library modal -->
+            <a id="matLibMobileLink"
+                class="text-zinc-400 px-6 py-3 flex items-center gap-3 hover:bg-white/5 transition-all duration-150 cursor-pointer"
+                href="#" role="button">
+                <span class="material-symbols-outlined">science</span>
+                <span class="font-['Space_Grotesk'] text-sm">Material Library</span>
+            </a>
+        </nav>
+
+        <!-- Bottom section -->
+        <div class="mt-auto px-6 space-y-2">
+            <div class="pt-6 border-t border-white/5 space-y-3">
+                <!-- Documentation → opens doc modal and closes mobile sidebar -->
+                <a id="docLinkMobile"
+                    class="flex items-center gap-3 text-zinc-500 hover:text-zinc-300
+                           text-xs uppercase tracking-widest transition-colors cursor-pointer"
+                    href="#" role="button" aria-haspopup="dialog">
+                    <span class="material-symbols-outlined text-sm">menu_book</span>
+                    Documentation
+                </a>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         MAIN CONTENT
+    ═══════════════════════════════════════════════════════════════════════════ -->
+    <main class="ml-0 md:ml-64 pt-20 pb-24 px-3 sm:px-6 min-h-screen">
+        <div class="max-w-7xl mx-auto space-y-6">
+
+            <!-- ── Page Header ──────────────────────────────────────────── -->
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3 mb-6 sm:mb-8">
+                <div>
+                    <h1 class="font-h1 text-2xl sm:text-3xl lg:text-4xl text-white tracking-tight leading-tight">
+                        PN Junction Diode Simulator
+                    </h1>
+                    <p class="text-zinc-400 mt-1 sm:mt-2 text-sm sm:text-base">
+                        Interactive Semiconductor Visualization Tool
+                    </p>
+                </div>
+                <!-- Engine status — shrinks on small screens -->
+                <div class="flex items-center gap-2 sm:gap-3 bg-surface-container rounded-full
+                            px-3 sm:px-4 py-1.5 sm:py-2 border border-white/5 flex-shrink-0">
+                    <span class="flex h-2 w-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                    <span class="text-[10px] sm:text-xs font-mono-data text-cyan-400 tracking-tighter uppercase whitespace-nowrap">
+                        Engine: Optimal
+                    </span>
+                </div>
+            </div>
+
+            <!-- ── Controls + Chart Grid ──────────────────────────────── -->
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6">
+
+                <!-- ════════════════════════════════════════════════════════
+                     LEFT COLUMN — Simulation Controls
+                ════════════════════════════════════════════════════════ -->
+                <section class="md:col-span-5 lg:col-span-4 space-y-4 sm:space-y-6" aria-label="Simulation controls">
+
+                    <!-- Controls card -->
+                    <div class="glass-panel p-6 rounded-2xl glow-cyan">
+                        <div class="flex items-center gap-3 mb-6">
+                            <span class="material-symbols-outlined text-cyan-400">tune</span>
+                            <h3 class="font-h3 text-xl text-white">Simulation Controls</h3>
+                        </div>
+
+                        <div class="space-y-6">
+
+                            <!-- ── Material Dropdown ──────────────────── -->
+                            <div class="space-y-2">
+                                <label class="text-xs font-label-caps text-zinc-400 uppercase"
+                                       for="materialSelect">
+                                    Semiconductor Material
+                                </label>
+
+                                <!--
+                                    id="materialSelect"
+                                    Options are injected dynamically by populateMaterialSelect() in script.js.
+                                    option.value === MATERIALS key — this is the core bug fix.
+                                -->
+                                <select id="materialSelect"
+                                    class="w-full bg-surface-container-lowest border border-outline-variant
+                                           text-zinc-200 rounded-lg px-4 py-3 focus:outline-none
+                                           focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400
+                                           transition-all font-body-md"
+                                    aria-label="Select semiconductor material">
+                                    <!-- <option> elements inserted by script.js -->
+                                </select>
+
+                                <!-- Live material colour badge -->
+                                <div id="matBadge"
+                                    class="mat-badge inline-flex items-center gap-2 text-[10px]
+                                           font-mono-data uppercase tracking-widest px-3 py-1
+                                           rounded-full border border-cyan-400/30 text-cyan-400 bg-cyan-400/10"
+                                    aria-live="polite">
+                                    <span id="matBadgeDot"
+                                          class="h-1.5 w-1.5 rounded-full bg-cyan-400 inline-block"></span>
+                                    <span id="matBadgeLabel">Silicon</span>
+                                </div>
+                            </div>
+
+                            <!-- ── Bias Voltage Slider ─────────────────── -->
+                            <div class="space-y-3">
+                                <div class="flex justify-between items-center">
+                                    <label class="text-xs font-label-caps text-zinc-400 uppercase"
+                                           for="voltageSlider">
+                                        Forward / Reverse Bias
+                                    </label>
+                                    <!-- Live voltage readout — updated on every slider tick -->
+                                    <span id="voltageDisplay"
+                                          class="text-cyan-400 font-mono-data"
+                                          aria-live="polite">+0.75V</span>
+                                </div>
+
+                                <!--
+                                    id="voltageSlider"
+                                    Range: −2 V to +2 V, 0.01 V resolution.
+                                    Triggers updateAll() via 'input' event in script.js.
+                                -->
+                                <input id="voltageSlider"
+                                    type="range" min="-2" max="2" step="0.01" value="0.75"
+                                    class="w-full"
+                                    aria-label="Bias voltage"
+                                    aria-valuemin="-2" aria-valuemax="2" aria-valuenow="0.75">
+
+                                <div class="flex justify-between text-[10px] text-zinc-600 font-mono-data"
+                                     aria-hidden="true">
+                                    <span id="voltageMinLabel">−2.0 V</span>
+                                    <span>0 V</span>
+                                    <span id="voltageMaxLabel">+2.0 V</span>
+                                </div>
+                            </div>
+
+                            <!-- ── Temperature Slider ──────────────────── -->
+                            <div class="space-y-3">
+                                <div class="flex justify-between items-center">
+                                    <label class="text-xs font-label-caps text-zinc-400 uppercase"
+                                           for="tempSlider">
+                                        Junction Temperature
+                                    </label>
+                                    <!-- Live temperature + Vt readouts -->
+                                    <div class="text-right" aria-live="polite">
+                                        <span id="tempDisplay" class="text-cyan-400 font-mono-data">300 K</span>
+                                        <span id="vtDisplay"
+                                              class="block text-[10px] text-zinc-600 font-mono-data">
+                                            Vt = 25.85 mV
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!--
+                                    id="tempSlider"
+                                    Range: 200 K to 400 K, 1 K resolution.
+                                    Triggers updateAll() → recalculates Vt = kT/q.
+                                -->
+                                <input id="tempSlider"
+                                    type="range" min="200" max="400" step="1" value="300"
+                                    class="w-full"
+                                    aria-label="Junction temperature"
+                                    aria-valuemin="200" aria-valuemax="400" aria-valuenow="300">
+
+                                <div class="flex justify-between text-[10px] text-zinc-600 font-mono-data"
+                                     aria-hidden="true">
+                                    <span>200 K</span>
+                                    <span>300 K</span>
+                                    <span>400 K</span>
+                                </div>
+                            </div>
+
+                            <!-- ── Bias Mode Toggle ────────────────────── -->
+                            <div class="flex items-center justify-between p-4
+                                        bg-surface-container-low rounded-xl border border-white/5">
+                                <div>
+                                    <span class="block text-xs font-label-caps text-zinc-400 uppercase">
+                                        Biasing State
+                                    </span>
+                                    <!--
+                                        id="biasStateText"
+                                        Updated by script.js: "FORWARD BIAS" or "REVERSE BIAS"
+                                    -->
+                                    <span id="biasStateText"
+                                          class="text-cyan-400 font-bold tracking-tight"
+                                          aria-live="polite">
+                                        FORWARD BIAS
+                                    </span>
+                                </div>
+
+                                <!-- Toggle switch -->
+                                <label class="relative inline-flex items-center cursor-pointer"
+                                       aria-label="Toggle bias mode">
+                                    <!--
+                                        id="biasToggle"
+                                        checked  = Forward Bias  (default)
+                                        unchecked = Reverse Bias
+                                    -->
+                                    <input id="biasToggle"
+                                        type="checkbox" checked
+                                        class="sr-only peer"
+                                        role="switch"
+                                        aria-checked="true">
+                                    <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer
+                                                peer-checked:after:translate-x-full peer-checked:after:border-white
+                                                after:content-[''] after:absolute after:top-[2px] after:left-[2px]
+                                                after:bg-white after:border-gray-300 after:border after:rounded-full
+                                                after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-500">
+                                    </div>
+                                </label>
+                            </div>
+
+                        </div><!-- /space-y-6 -->
+                    </div><!-- /controls card -->
+
+
+                    <!-- ── Status + Efficiency Mini Cards ─────────────── -->
+                    <div class="grid grid-cols-2 gap-4">
+
+                        <!-- Diode Status: ON / OFF -->
+                        <div class="glass-panel p-4 rounded-2xl border-cyan-500/20 bg-cyan-500/5
+                                    flex flex-col items-center justify-center text-center">
+                            <span class="text-[10px] font-label-caps text-zinc-500 uppercase mb-1">Status</span>
+                            <div class="flex items-center gap-2">
+                                <!-- id="statusDot" — cyan glow when ON, grey when OFF -->
+                                <span id="statusDot"
+                                      class="h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#00e5ff]"
+                                      aria-hidden="true"></span>
+                                <!-- id="statusText" — "ON" / "OFF" -->
+                                <span id="statusText"
+                                      class="text-xl font-bold text-white tracking-tight"
+                                      aria-live="polite">ON</span>
+                            </div>
+                        </div>
+
+                        <!-- Efficiency -->
+                        <div class="glass-panel p-4 rounded-2xl bg-surface-container
+                                    flex flex-col items-center justify-center text-center">
+                            <span class="text-[10px] font-label-caps text-zinc-500 uppercase mb-1">
+                                Efficiency
+                            </span>
+                            <!-- id="efficiencyVal" — updated by script.js -->
+                            <span id="efficiencyVal"
+                                  class="text-xl font-bold text-white tracking-tight"
+                                  aria-live="polite">
+                                98.2%
+                            </span>
+                        </div>
+
+                    </div>
+                </section><!-- /LEFT COLUMN -->
+
+
+                <!-- ════════════════════════════════════════════════════════
+                     RIGHT COLUMN — Chart + Info Cards
+                ════════════════════════════════════════════════════════ -->
+                <section class="md:col-span-7 lg:col-span-8 space-y-4 sm:space-y-6" aria-label="I-V chart and results">
+
+                    <!-- ── I-V Characteristics Chart ───────────────────── -->
+                    <div class="glass-panel rounded-2xl overflow-hidden flex flex-col
+                                h-[280px] sm:h-[380px] lg:h-[500px]"
+                         role="img" aria-label="I-V characteristics chart">
+
+                        <!-- Chart header bar -->
+                        <div class="px-4 sm:px-6 py-3 sm:py-5 border-b border-white/5
+                                    flex justify-between items-center bg-zinc-950/20">
+                            <div>
+                                <h3 class="font-h3 text-base sm:text-xl text-white">I-V Characteristics</h3>
+                                <p class="text-[10px] sm:text-xs text-zinc-500 font-mono-data tracking-tighter uppercase">
+                                    Current (mA) vs Voltage (V)
+                                </p>
+                            </div>
+
+                            <!-- Chart toolbar -->
+                            <div class="flex items-center gap-1">
+                                <!-- Zoom In: narrows x-axis range by 30% centred on current voltage -->
+                                <button id="zoomInBtn"
+                                    title="Zoom in"
+                                    class="p-2 hover:bg-white/5 rounded-lg text-zinc-400 hover:text-cyan-400 transition-colors"
+                                    aria-label="Zoom in">
+                                    <span class="material-symbols-outlined">zoom_in</span>
+                                </button>
+                                <!-- Zoom Out: expands x-axis range by 30%, capped at [−2, +2] -->
+                                <button id="zoomOutBtn"
+                                    title="Zoom out"
+                                    class="p-2 hover:bg-white/5 rounded-lg text-zinc-400 hover:text-cyan-400 transition-colors"
+                                    aria-label="Zoom out">
+                                    <span class="material-symbols-outlined">zoom_out</span>
+                                </button>
+                                <!-- Divider -->
+                                <div class="h-5 w-px bg-white/10 mx-1" aria-hidden="true"></div>
+                                <!-- Toggle Chart.js grid lines -->
+                                <button id="toggleGridBtn"
+                                    title="Toggle grid"
+                                    class="p-2 hover:bg-white/5 rounded-lg text-zinc-400 hover:text-cyan-400 transition-colors"
+                                    aria-label="Toggle grid">
+                                    <span class="material-symbols-outlined">grid_on</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Canvas wrapper — flex-grow fills remaining card height -->
+                        <div class="chart-container flex-grow relative">
+                            <!-- Subtle dot-grid decorative backdrop -->
+                            <div id="gridOverlay"
+                                class="absolute inset-0 opacity-5 pointer-events-none"
+                                style="background-image:
+                                    linear-gradient(#ffffff 1px, transparent 1px),
+                                    linear-gradient(90deg, #ffffff 1px, transparent 1px);
+                                    background-size: 40px 40px;"
+                                aria-hidden="true">
+                            </div>
+
+                            <!--
+                                id="ivChart" — Chart.js draws here.
+                                initChart() in script.js attaches to this canvas.
+                                Position absolute + inset-0 so it fills the .chart-container div.
+                            -->
+                            <canvas id="ivChart" aria-label="I-V curve chart"></canvas>
+                        </div>
+                    </div><!-- /chart panel -->
+
+
+                    <!-- ── Parameter Info Cards Row ────────────────────── -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
+
+                        <!-- Band Gap (Eg) -->
+                        <div class="glass-panel p-5 rounded-2xl">
+                            <span class="text-[10px] font-label-caps text-zinc-500 uppercase block mb-2">
+                                Band Gap (Eg)
+                            </span>
+                            <div class="flex items-baseline gap-1">
+                                <!-- id="bandGapVal" — updated from MATERIALS on every dropdown change -->
+                                <span id="bandGapVal"
+                                      class="text-2xl font-bold text-white font-mono-data"
+                                      aria-live="polite">1.10</span>
+                                <span class="text-xs text-zinc-400">eV</span>
+                            </div>
+                        </div>
+
+                        <!-- Cut-in Voltage (Vcut) -->
+                        <div class="glass-panel p-5 rounded-2xl">
+                            <span class="text-[10px] font-label-caps text-zinc-500 uppercase block mb-2">
+                                Cut-in Voltage
+                            </span>
+                            <div class="flex items-baseline gap-1">
+                                <!-- id="cutInVal" — updated from MATERIALS -->
+                                <span id="cutInVal"
+                                      class="text-2xl font-bold text-white font-mono-data"
+                                      aria-live="polite">0.70</span>
+                                <span class="text-xs text-zinc-400">V</span>
+                            </div>
+                        </div>
+
+                        <!-- Saturation Current (Is) -->
+                        <div class="glass-panel p-5 rounded-2xl">
+                            <span class="text-[10px] font-label-caps text-zinc-500 uppercase block mb-2">
+                                Saturation Current (Is)
+                            </span>
+                            <div class="flex items-baseline gap-1">
+                                <!--
+                                    id="isVal"  — numeric value (auto-scaled)
+                                    id="isUnit" — SI unit (pA / fA / nA etc.)
+                                -->
+                                <span id="isVal"
+                                      class="text-2xl font-bold text-white font-mono-data"
+                                      aria-live="polite">1.00</span>
+                                <span id="isUnit" class="text-xs text-zinc-400">pA</span>
+                            </div>
+                        </div>
+
+                        <!-- Live Operating-Point Current (Id) -->
+                        <div class="glass-panel p-5 rounded-2xl border border-cyan-500/10">
+                            <span class="text-[10px] font-label-caps text-zinc-500 uppercase block mb-2">
+                                Current (Id)
+                            </span>
+                            <div class="flex items-baseline gap-1">
+                                <!--
+                                    id="currentVal"  — live current at the slider voltage
+                                    id="currentUnit" — SI unit
+                                    Colour matches the material colour (set inline by script.js)
+                                -->
+                                <span id="currentVal"
+                                      class="text-2xl font-bold font-mono-data text-cyan-400"
+                                      aria-live="polite">---</span>
+                                <span id="currentUnit" class="text-xs text-zinc-400">mA</span>
+                            </div>
+                        </div>
+
+                    </div><!-- /info cards row -->
+
+                </section><!-- /RIGHT COLUMN -->
+
+            </div><!-- /Controls + Chart Grid -->
+
+
+            <!-- ── Bottom Row: Graph Summary + Quick Export ──── -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+
+                <!-- Graph Summary card — all values updated live by updateGraphSummary() in script.js -->
+                <div class="md:col-span-2 glass-panel p-6 rounded-2xl" aria-label="Graph summary">
+
+                    <!-- Header -->
+                    <div class="flex items-center justify-between mb-5">
+                        <div class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-cyan-400 text-base">analytics</span>
+                            <h4 class="text-white font-h3 text-lg">Graph Summary</h4>
+                        </div>
+                        <!-- id="summaryRegionBadge" — operating region pill (OFF / Conducting / Breakdown) -->
+                        <span id="summaryRegionBadge"
+                              class="text-[10px] font-mono-data uppercase tracking-widest px-3 py-1
+                                     rounded-full border border-cyan-400/30 text-cyan-400 bg-cyan-400/10"
+                              aria-live="polite">
+                            Conducting
+                        </span>
+                    </div>
+
+                    <!-- Stats grid — 2 cols mobile → 3 cols sm+ -->
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4">
+
+                        <!-- Operating Current -->
+                        <div class="bg-surface-container-low rounded-xl p-3 border border-white/5">
+                            <span class="text-[10px] font-label-caps text-zinc-500 uppercase block mb-1">
+                                Op. Current (Id)
+                            </span>
+                            <div class="flex items-baseline gap-1">
+                                <!-- id="summaryOpIVal" / id="summaryOpIUnit" -->
+                                <span id="summaryOpIVal"
+                                      class="text-lg font-bold font-mono-data text-cyan-400"
+                                      aria-live="polite">---</span>
+                                <span id="summaryOpIUnit"
+                                      class="text-[10px] text-zinc-500">mA</span>
+                            </div>
+                        </div>
+
+                        <!-- Peak Forward Current (max I across the full curve) -->
+                        <div class="bg-surface-container-low rounded-xl p-3 border border-white/5">
+                            <span class="text-[10px] font-label-caps text-zinc-500 uppercase block mb-1">
+                                Peak Current
+                            </span>
+                            <div class="flex items-baseline gap-1">
+                                <!-- id="summaryPeakIVal" / id="summaryPeakIUnit" -->
+                                <span id="summaryPeakIVal"
+                                      class="text-lg font-bold font-mono-data text-white"
+                                      aria-live="polite">---</span>
+                                <span id="summaryPeakIUnit"
+                                      class="text-[10px] text-zinc-500">mA</span>
+                            </div>
+                        </div>
+
+                        <!-- Thermal Voltage Vt -->
+                        <div class="bg-surface-container-low rounded-xl p-3 border border-white/5">
+                            <span class="text-[10px] font-label-caps text-zinc-500 uppercase block mb-1">
+                                Thermal Voltage
+                            </span>
+                            <div class="flex items-baseline gap-1">
+                                <!-- id="summaryVtVal" -->
+                                <span id="summaryVtVal"
+                                      class="text-lg font-bold font-mono-data text-white"
+                                      aria-live="polite">25.85</span>
+                                <span class="text-[10px] text-zinc-500">mV</span>
+                            </div>
+                        </div>
+
+                        <!-- Bias Mode -->
+                        <div class="bg-surface-container-low rounded-xl p-3 border border-white/5">
+                            <span class="text-[10px] font-label-caps text-zinc-500 uppercase block mb-1">
+                                Bias Mode
+                            </span>
+                            <!-- id="summaryBiasMode" -->
+                            <span id="summaryBiasMode"
+                                  class="text-lg font-bold font-mono-data text-white"
+                                  aria-live="polite">Forward</span>
+                        </div>
+
+                        <!-- Cut-in clearance: how far V is above / below Vcut -->
+                        <div class="bg-surface-container-low rounded-xl p-3 border border-white/5">
+                            <span class="text-[10px] font-label-caps text-zinc-500 uppercase block mb-1">
+                                V &minus; Vcut
+                            </span>
+                            <div class="flex items-baseline gap-1">
+                                <!-- id="summaryClearanceVal" -->
+                                <span id="summaryClearanceVal"
+                                      class="text-lg font-bold font-mono-data text-white"
+                                      aria-live="polite">+0.05</span>
+                                <span class="text-[10px] text-zinc-500">V</span>
+                            </div>
+                        </div>
+
+                        <!-- Material in use -->
+                        <div class="bg-surface-container-low rounded-xl p-3 border border-white/5">
+                            <span class="text-[10px] font-label-caps text-zinc-500 uppercase block mb-1">
+                                Material
+                            </span>
+                            <!-- id="summaryMaterial" -->
+                            <span id="summaryMaterial"
+                                  class="text-lg font-bold font-mono-data text-white truncate block"
+                                  aria-live="polite">Si</span>
+                        </div>
+
+                    </div><!-- /stats grid -->
+                </div><!-- /graph summary card -->
+
+                <!-- Quick Export card -->
+                <div class="glass-panel p-6 rounded-2xl flex flex-col justify-center">
+                    <h4 class="text-white font-h3 text-lg mb-4">Quick Export</h4>
+                    <div class="grid grid-cols-2 gap-3">
+
+                        <!-- PDF via window.print() — print CSS hides UI chrome -->
+                        <button id="pdfExportBtn"
+                            class="bg-surface-container hover:bg-surface-container-high p-3 rounded-xl
+                                   flex flex-col items-center gap-2 transition-all border border-white/5
+                                   active:scale-95">
+                            <span class="material-symbols-outlined text-zinc-400">picture_as_pdf</span>
+                            <span class="text-[10px] text-zinc-400 uppercase font-bold">PDF Report</span>
+                        </button>
+
+                        <!-- CSV download — calls exportCSV() in script.js -->
+                        <button id="csvExportBtn"
+                            class="bg-surface-container hover:bg-surface-container-high p-3 rounded-xl
+                                   flex flex-col items-center gap-2 transition-all border border-white/5
+                                   active:scale-95">
+                            <span class="material-symbols-outlined text-zinc-400">csv</span>
+                            <span class="text-[10px] text-zinc-400 uppercase font-bold">CSV Data</span>
+                        </button>
+
+                    </div>
+                </div>
+
+            </div><!-- /bottom row -->
+
+        </div><!-- /max-w-7xl -->
+    </main><!-- /MAIN -->
+
+
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         DOCUMENTATION MODAL — Slide-in drawer from the right edge
+         ─────────────────────────────────────────────────────────────────────
+         Classes managed by script.js:
+           .hidden  → display: none   (initial state)
+           .open    → triggers CSS transform: translateX(0) on #docPanel
+    ═══════════════════════════════════════════════════════════════════════════ -->
+    <div id="docModal"
+         class="fixed inset-0 z-[200] hidden"
+         role="dialog"
+         aria-modal="true"
+         aria-label="Documentation panel">
+
+        <!-- Semi-transparent backdrop — click closes modal -->
+        <div id="docBackdrop"
+             class="absolute inset-0 bg-black/60 backdrop-blur-sm"
+             aria-hidden="true"></div>
+
+        <!-- Slide-in panel -->
+        <div id="docPanel"
+            class="absolute right-0 top-0 h-full w-full max-w-2xl bg-zinc-950
+                   border-l border-white/10 overflow-y-auto flex flex-col
+                   shadow-2xl shadow-black/60">
+
+            <!-- Modal header (sticky) -->
+            <div class="flex items-center justify-between px-4 sm:px-8 py-4 sm:py-6
+                        border-b border-white/10 bg-zinc-950/80 sticky top-0 z-10 backdrop-blur-md">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined text-cyan-400">menu_book</span>
+                    <h2 class="text-white font-['Space_Grotesk'] text-xl font-bold">Documentation</h2>
+                </div>
+                <!-- X close button -->
+                <button id="closeDocModal"
+                    class="text-zinc-500 hover:text-white transition-colors p-2
+                           hover:bg-white/5 rounded-lg"
+                    aria-label="Close documentation panel">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div><!-- /modal header -->
+
+            <!-- Modal scrollable body -->
+            <div class="px-4 sm:px-8 py-6 space-y-8 sm:space-y-10 flex-grow">
+
+                <!-- ── Developer Profile ─────────────────────────────── -->
+                <section aria-label="Developer profile">
+                    <div class="flex items-center gap-4 sm:gap-6 p-5 sm:p-6
+                                bg-gradient-to-br from-cyan-500/10 to-transparent
+                                border border-cyan-500/20 rounded-2xl">
+                        <!-- Circular avatar -->
+                        <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full flex-shrink-0
+                                    border-2 border-cyan-400/50 shadow-lg shadow-cyan-500/20
+                                    flex items-center justify-center"
+                             style="background: linear-gradient(135deg, #006875, #00daf3);"
+                             role="img" aria-label="Asmita Yadav avatar">
+                            <span class="text-xl sm:text-2xl font-bold text-white font-['Space_Grotesk']"
+                                  aria-hidden="true">AY</span>
+                        </div>
+                        <div>
+                            <h3 class="text-white font-['Space_Grotesk'] text-lg sm:text-xl font-bold">
+                                Asmita Yadav
+                            </h3>
+                            <p class="text-cyan-400 text-xs sm:text-sm font-mono-data tracking-widest uppercase mt-1">
+                                RA2511003050539
+                            </p>
+                            <p class="text-zinc-400 text-xs sm:text-sm mt-1">
+                                CSE &ndash; H &nbsp;&middot;&nbsp; 1<sup>st</sup> Year
+                            </p>
+                            <p class="text-zinc-500 text-xs mt-1.5">
+                                Developer &middot; PN Junction Diode Simulator v2.0
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ── About the Tool ────────────────────────────────── -->
+                <section aria-label="About this tool">
+                    <h3 class="text-white font-['Space_Grotesk'] text-lg font-semibold mb-3
+                               flex items-center gap-2">
+                        <span class="material-symbols-outlined text-cyan-400 text-base">info</span>
+                        About This Tool
+                    </h3>
+                    <p class="text-zinc-400 text-sm leading-relaxed">
+                        <strong class="text-zinc-200">PN-Sim v2.0</strong> is an interactive,
+                        browser-based semiconductor simulator for laboratory analysis and education.
+                        It models the current-voltage (I-V) characteristics of a PN junction diode
+                        using the <em>Shockley Ideal Diode Equation</em>, with real-time temperature
+                        dependence, 12 built-in semiconductor materials, a custom material editor,
+                        and Zener/avalanche reverse breakdown modelling.
+                    </p>
+                    <p class="text-zinc-500 text-sm mt-3 leading-relaxed">
+                        All calculations run entirely in the browser — no server or build step.
+                        The voltage slider range <strong class="text-zinc-400">expands automatically</strong>
+                        for wide-bandgap materials (SiC, GaN, ZnO, Diamond) so the diode always
+                        reaches its conduction region regardless of cut-in voltage.
+                    </p>
+                    <!-- Version changelog pills -->
+                    <div class="flex flex-wrap gap-2 mt-4">
+                        <span class="text-[10px] font-mono-data uppercase tracking-widest px-2.5 py-1
+                                     rounded-full bg-cyan-400/10 border border-cyan-400/20 text-cyan-400">
+                            Dynamic voltage range
+                        </span>
+                        <span class="text-[10px] font-mono-data uppercase tracking-widest px-2.5 py-1
+                                     rounded-full bg-purple-400/10 border border-purple-400/20 text-purple-400">
+                            Custom material editor
+                        </span>
+                        <span class="text-[10px] font-mono-data uppercase tracking-widest px-2.5 py-1
+                                     rounded-full bg-green-400/10 border border-green-400/20 text-green-400">
+                            Graph summary panel
+                        </span>
+                        <span class="text-[10px] font-mono-data uppercase tracking-widest px-2.5 py-1
+                                     rounded-full bg-amber-400/10 border border-amber-400/20 text-amber-400">
+                            Fully responsive
+                        </span>
+                    </div>
+                </section>
+
+                <!-- ── Physics & Formulas ────────────────────────────── -->
+                <section aria-label="Physics formulas">
+                    <h3 class="text-white font-['Space_Grotesk'] text-lg font-semibold mb-4
+                               flex items-center gap-2">
+                        <span class="material-symbols-outlined text-cyan-400 text-base">functions</span>
+                        Physics &amp; Formulas
+                    </h3>
+                    <div class="space-y-3">
+
+                        <!-- Shockley equation -->
+                        <div class="p-4 bg-surface-container rounded-xl border border-white/5">
+                            <p class="text-cyan-400 text-[10px] font-label-caps uppercase mb-2">
+                                Shockley Ideal Diode Equation
+                            </p>
+                            <code class="text-green-400 font-mono text-sm block">
+                                I = I<sub>s</sub> &middot; (exp(V / (n &middot; V<sub>t</sub>)) &minus; 1)
+                            </code>
+                            <div class="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-zinc-500 text-xs font-mono-data">
+                                <div><span class="text-zinc-400">I</span> &mdash; diode current (A)</div>
+                                <div><span class="text-zinc-400">I<sub>s</sub></span> &mdash; reverse saturation current (A)</div>
+                                <div><span class="text-zinc-400">V</span> &mdash; applied voltage (V)</div>
+                                <div><span class="text-zinc-400">n</span> &mdash; ideality factor = 1.5</div>
+                                <div><span class="text-zinc-400">V<sub>t</sub></span> &mdash; thermal voltage (V)</div>
+                            </div>
+                        </div>
+
+                        <!-- Thermal voltage -->
+                        <div class="p-4 bg-surface-container rounded-xl border border-white/5">
+                            <p class="text-cyan-400 text-[10px] font-label-caps uppercase mb-2">
+                                Thermal Voltage
+                            </p>
+                            <code class="text-green-400 font-mono text-sm block">V<sub>t</sub> = kT / q</code>
+                            <div class="mt-3 space-y-1 text-zinc-500 text-xs font-mono-data">
+                                <div>k = 1.38 &times; 10<sup>&minus;23</sup> J/K &nbsp;(Boltzmann constant)</div>
+                                <div>q = 1.60 &times; 10<sup>&minus;19</sup> C &nbsp;(Electron charge)</div>
+                                <div>T = Junction temperature (K) — slider range 200–400 K</div>
+                                <div class="text-zinc-400 mt-1">
+                                    At 300 K &rarr; V<sub>t</sub> &asymp; 25.85 mV
+                                    &nbsp;&middot;&nbsp;
+                                    At 400 K &rarr; V<sub>t</sub> &asymp; 34.47 mV
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Ideality factor -->
+                        <div class="p-4 bg-surface-container rounded-xl border border-white/5">
+                            <p class="text-cyan-400 text-[10px] font-label-caps uppercase mb-2">
+                                Ideality Factor (n) &mdash; fixed at 1.5
+                            </p>
+                            <code class="text-green-400 font-mono text-sm block">n = 1.5</code>
+                            <p class="text-zinc-500 text-xs mt-2">
+                                n = 1: ideal diffusion-only.&nbsp; n = 2: recombination-dominated.&nbsp;
+                                n = 1.5 is a realistic mid-point for practical diodes.
+                            </p>
+                        </div>
+
+                        <!-- Reverse breakdown -->
+                        <div class="p-4 bg-surface-container rounded-xl border border-white/5">
+                            <p class="text-cyan-400 text-[10px] font-label-caps uppercase mb-2">
+                                Reverse Breakdown Model (Reverse Bias Mode only)
+                            </p>
+                            <code class="text-green-400 font-mono text-sm block">
+                                I<sub>break</sub> = &minus;2 &middot; exp((|V| &minus; V<sub>br</sub>) / 0.05)
+                            </code>
+                            <p class="text-zinc-500 text-xs mt-2">
+                                Activates when V &lt; &minus;V<sub>br</sub>. Toggle
+                                <em>Biasing State</em> to Reverse to expose this region.
+                            </p>
+                        </div>
+
+                        <!-- Dynamic voltage range — NEW -->
+                        <div class="p-4 bg-surface-container rounded-xl border border-cyan-400/15 relative overflow-hidden">
+                            <div class="absolute top-3 right-3 text-[9px] font-bold uppercase
+                                        tracking-widest text-cyan-400 bg-cyan-400/10 px-2 py-0.5 rounded-full">
+                                v2.0 fix
+                            </div>
+                            <p class="text-cyan-400 text-[10px] font-label-caps uppercase mb-2">
+                                Dynamic Voltage Slider Range
+                            </p>
+                            <code class="text-green-400 font-mono text-sm block">
+                                V<sub>max</sub> = ceil( max(2.0, V<sub>cut</sub> + 0.5) &times; 2 ) / 2
+                            </code>
+                            <p class="text-zinc-500 text-xs mt-2">
+                                The slider max auto-expands to at least 0.5 V above V<sub>cut</sub>,
+                                rounded to the nearest 0.5 V. Fixes Status and Efficiency always
+                                showing OFF/0% for SiC, GaN, ZnO, and Diamond.
+                            </p>
+                        </div>
+
+                    </div>
+                </section>
+
+                <!-- ── Material Database Table ───────────────────────── -->
+                <section aria-label="Material database">
+                    <h3 class="text-white font-['Space_Grotesk'] text-lg font-semibold mb-3
+                               flex items-center gap-2">
+                        <span class="material-symbols-outlined text-cyan-400 text-base">table_chart</span>
+                        Built-in Material Database
+                        <span class="ml-auto text-[10px] font-mono-data text-zinc-600
+                                     uppercase tracking-widest font-normal">12 materials</span>
+                    </h3>
+                    <div class="overflow-x-auto rounded-xl border border-white/10">
+                        <table class="w-full text-xs text-zinc-400 font-mono-data">
+                            <thead>
+                                <tr class="bg-surface-container text-zinc-500 text-[10px] uppercase tracking-widest">
+                                    <th class="text-left px-4 py-3">Material</th>
+                                    <th class="text-right px-3 py-3">E<sub>g</sub></th>
+                                    <th class="text-right px-3 py-3">I<sub>s</sub></th>
+                                    <th class="text-right px-3 py-3">V<sub>cut</sub></th>
+                                    <th class="text-right px-3 py-3">V<sub>br</sub></th>
+                                    <th class="text-right px-3 py-3">Slider max</th>
+                                </tr>
+                            </thead>
+                            <!-- id="matTableBody" — rows injected by populateMaterialTable() -->
+                            <tbody id="matTableBody" class="divide-y divide-white/5">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-zinc-600 text-[10px] font-mono-data mt-2">
+                        Add your own via <strong class="text-zinc-500">Material Library</strong> in the nav bar.
+                    </p>
+                </section>
+
+                <!-- ── Features Overview ─────────────────────────────── -->
+                <section aria-label="Features overview">
+                    <h3 class="text-white font-['Space_Grotesk'] text-lg font-semibold mb-4
+                               flex items-center gap-2">
+                        <span class="material-symbols-outlined text-cyan-400 text-base">star</span>
+                        Features
+                    </h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+                        <div class="p-3 bg-surface-container rounded-xl border border-white/5 space-y-1">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-cyan-400" style="font-size:16px;">show_chart</span>
+                                <span class="text-zinc-300 text-xs font-semibold">Real-time I-V Chart</span>
+                            </div>
+                            <p class="text-zinc-600 text-xs">400-point smooth curve with animated redraws. Glowing operating-point dot + crosshair tracks the voltage slider live.</p>
+                        </div>
+
+                        <div class="p-3 bg-surface-container rounded-xl border border-white/5 space-y-1">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-purple-400" style="font-size:16px;">science</span>
+                                <span class="text-zinc-300 text-xs font-semibold">Material Library</span>
+                            </div>
+                            <p class="text-zinc-600 text-xs">12 built-in semiconductors. Add custom materials via the nav — they appear in the simulator dropdown instantly with ★.</p>
+                        </div>
+
+                        <div class="p-3 bg-surface-container rounded-xl border border-white/5 space-y-1">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-amber-400" style="font-size:16px;">thermostat</span>
+                                <span class="text-zinc-300 text-xs font-semibold">Temperature Slider</span>
+                            </div>
+                            <p class="text-zinc-600 text-xs">200–400 K. Recalculates V<sub>t</sub> = kT/q live. Higher temperature increases leakage and shifts the knee left.</p>
+                        </div>
+
+                        <div class="p-3 bg-surface-container rounded-xl border border-white/5 space-y-1">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-cyan-400" style="font-size:16px;">swap_horiz</span>
+                                <span class="text-zinc-300 text-xs font-semibold">Forward / Reverse Bias</span>
+                            </div>
+                            <p class="text-zinc-600 text-xs">Toggle switches between standard Shockley curve and Zener/avalanche breakdown model.</p>
+                        </div>
+
+                        <div class="p-3 bg-surface-container rounded-xl border border-white/5 space-y-1">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-green-400" style="font-size:16px;">analytics</span>
+                                <span class="text-zinc-300 text-xs font-semibold">Graph Summary Panel</span>
+                            </div>
+                            <p class="text-zinc-600 text-xs">Live: operating current, peak current, V<sub>t</sub>, bias mode, V&minus;V<sub>cut</sub> clearance, and operating region badge.</p>
+                        </div>
+
+                        <div class="p-3 bg-surface-container rounded-xl border border-white/5 space-y-1">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-cyan-400" style="font-size:16px;">zoom_in</span>
+                                <span class="text-zinc-300 text-xs font-semibold">Zoom In / Zoom Out</span>
+                            </div>
+                            <p class="text-zinc-600 text-xs">Chart toolbar zooms 30% per click, centred on the current voltage. Respects the material's dynamic range.</p>
+                        </div>
+
+                        <div class="p-3 bg-surface-container rounded-xl border border-white/5 space-y-1">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-amber-400" style="font-size:16px;">download</span>
+                                <span class="text-zinc-300 text-xs font-semibold">Export</span>
+                            </div>
+                            <p class="text-zinc-600 text-xs">CSV download (400 points + metadata) and PDF print. Available in the header and Quick Export card.</p>
+                        </div>
+
+                        <div class="p-3 bg-surface-container rounded-xl border border-white/5 space-y-1">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-green-400" style="font-size:16px;">smartphone</span>
+                                <span class="text-zinc-300 text-xs font-semibold">Fully Responsive</span>
+                            </div>
+                            <p class="text-zinc-600 text-xs">Works on all screen sizes. Tap ☰ on mobile to open the slide-in sidebar with full navigation.</p>
+                        </div>
+
+                    </div>
+                </section>
+
+                <!-- ── How to Use ─────────────────────────────────────── -->
+                <section aria-label="How to use">
+                    <h3 class="text-white font-['Space_Grotesk'] text-lg font-semibold mb-3
+                               flex items-center gap-2">
+                        <span class="material-symbols-outlined text-cyan-400 text-base">help_outline</span>
+                        How to Use
+                    </h3>
+                    <ol class="space-y-3 text-zinc-400 text-sm">
+                        <li class="flex gap-3">
+                            <span class="text-cyan-400 font-bold flex-shrink-0">01.</span>
+                            Select a <strong class="text-zinc-300">semiconductor material</strong> from the dropdown.
+                            Band gap, I<sub>s</sub>, V<sub>cut</sub>, curve colour, and the voltage slider range all update instantly.
+                        </li>
+                        <li class="flex gap-3">
+                            <span class="text-cyan-400 font-bold flex-shrink-0">02.</span>
+                            Drag the <strong class="text-zinc-300">Bias Voltage</strong> slider. The range
+                            auto-expands for wide-bandgap materials — SiC reaches +3.5 V, Diamond reaches +5.0 V —
+                            so Status and Efficiency always respond correctly for every material.
+                        </li>
+                        <li class="flex gap-3">
+                            <span class="text-cyan-400 font-bold flex-shrink-0">03.</span>
+                            Adjust <strong class="text-zinc-300">Junction Temperature</strong> (200–400 K).
+                            V<sub>t</sub> = kT/q recalculates live and the Graph Summary updates simultaneously.
+                        </li>
+                        <li class="flex gap-3">
+                            <span class="text-cyan-400 font-bold flex-shrink-0">04.</span>
+                            Toggle <strong class="text-zinc-300">Biasing State</strong> to Reverse Bias
+                            to activate Zener/avalanche breakdown on the chart.
+                        </li>
+                        <li class="flex gap-3">
+                            <span class="text-cyan-400 font-bold flex-shrink-0">05.</span>
+                            Click <strong class="text-zinc-300">Material Library</strong> in the nav bar
+                            (or mobile sidebar) to view all 12 built-in materials and add your own.
+                            Custom entries appear in the simulator dropdown immediately, marked with ★.
+                        </li>
+                        <li class="flex gap-3">
+                            <span class="text-cyan-400 font-bold flex-shrink-0">06.</span>
+                            Use the <strong class="text-zinc-300">zoom in / zoom out</strong> buttons in the chart
+                            toolbar to inspect any region in detail. The grid toggle hides/shows chart grid lines.
+                        </li>
+                        <li class="flex gap-3">
+                            <span class="text-cyan-400 font-bold flex-shrink-0">07.</span>
+                            Click <strong class="text-zinc-300">Export Data</strong> (header) or
+                            <em>Quick Export → CSV</em> to download a 400-point I-V dataset.
+                            Use <em>PDF Report</em> to print.
+                        </li>
+                        <li class="flex gap-3">
+                            <span class="text-cyan-400 font-bold flex-shrink-0">08.</span>
+                            Click <strong class="text-zinc-300">Reset</strong> in the header to restore
+                            all defaults — Silicon, +0.75 V, 300 K, Forward Bias.
+                        </li>
+                        <li class="flex gap-3">
+                            <span class="text-cyan-400 font-bold flex-shrink-0">09.</span>
+                            On <strong class="text-zinc-300">mobile</strong>, tap the ☰ icon (top-left)
+                            to open the navigation sidebar with links to Material Library, Documentation, and all sections.
+                        </li>
+                    </ol>
+                </section>
+
+                <!-- ── Voltage Slider Range Table ────────────────────── -->
+                <section aria-label="Slider ranges by material">
+                    <h3 class="text-white font-['Space_Grotesk'] text-lg font-semibold mb-3
+                               flex items-center gap-2">
+                        <span class="material-symbols-outlined text-cyan-400 text-base">tune</span>
+                        Voltage Slider Range per Material
+                    </h3>
+                    <div class="overflow-x-auto rounded-xl border border-white/10">
+                        <table class="w-full text-xs text-zinc-400 font-mono-data">
+                            <thead>
+                                <tr class="bg-surface-container text-zinc-500 text-[10px] uppercase tracking-widest">
+                                    <th class="text-left px-4 py-2.5">Material</th>
+                                    <th class="text-right px-4 py-2.5">V<sub>cut</sub></th>
+                                    <th class="text-right px-4 py-2.5">Slider max</th>
+                                    <th class="text-left px-4 py-2.5">Note</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-white/5">
+                                <tr class="hover:bg-white/[0.02]"><td class="px-4 py-2">Silicon, Ge, InAs, InSb</td><td class="px-4 py-2 text-right">&le; 0.70 V</td><td class="px-4 py-2 text-right text-cyan-400">+2.0 V</td><td class="px-4 py-2 text-zinc-600">Standard</td></tr>
+                                <tr class="hover:bg-white/[0.02]"><td class="px-4 py-2">GaAs, InP</td><td class="px-4 py-2 text-right">1.00–1.20 V</td><td class="px-4 py-2 text-right text-cyan-400">+2.0 V</td><td class="px-4 py-2 text-zinc-600">Standard</td></tr>
+                                <tr class="hover:bg-white/[0.02]"><td class="px-4 py-2">GaP, CdS</td><td class="px-4 py-2 text-right">1.80–2.00 V</td><td class="px-4 py-2 text-right text-cyan-400">+2.5 V</td><td class="px-4 py-2 text-zinc-600">Auto-expanded</td></tr>
+                                <tr class="hover:bg-white/[0.02]"><td class="px-4 py-2">SiC, ZnO, GaN</td><td class="px-4 py-2 text-right">2.80–3.00 V</td><td class="px-4 py-2 text-right text-amber-400">+3.5 V</td><td class="px-4 py-2 text-zinc-600">Wide bandgap</td></tr>
+                                <tr class="hover:bg-white/[0.02]"><td class="px-4 py-2">Diamond</td><td class="px-4 py-2 text-right">4.50 V</td><td class="px-4 py-2 text-right text-red-400">+5.0 V</td><td class="px-4 py-2 text-zinc-600">Ultra-wide gap</td></tr>
+                                <tr class="hover:bg-white/[0.02] bg-surface-container/50"><td class="px-4 py-2 text-zinc-500">Custom materials</td><td class="px-4 py-2 text-right text-zinc-600">your V<sub>cut</sub></td><td class="px-4 py-2 text-right text-zinc-500">auto</td><td class="px-4 py-2 text-zinc-600">Same formula applies</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+            </div><!-- /modal body -->
+
+            <!-- Modal footer (sticky bottom) -->
+            <div class="px-4 sm:px-8 py-4 border-t border-white/10 flex items-center
+                        justify-between bg-zinc-950/80">
+                <span class="text-zinc-600 text-xs font-mono-data">
+                    PN-Sim v2.0 &middot; High-Precision Engine
+                </span>
+                <!-- "Close Panel" text button -->
+                <button id="closeDocModal2"
+                    class="text-cyan-400 text-xs font-bold uppercase tracking-widest
+                           hover:text-cyan-300 transition-colors">
+                    Close Panel
+                </button>
+            </div>
+
+        </div><!-- /docPanel -->
+    </div><!-- /docModal -->
+
+
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         TOAST NOTIFICATION
+         ─────────────────────────────────────────────────────────────────────
+         Positioned in styles.css. Script.js adds/removes .show to animate.
+    ═══════════════════════════════════════════════════════════════════════════ -->
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         MATERIAL LIBRARY MODAL — Slide-in drawer from the right
+         ─────────────────────────────────────────────────────────────────────
+         Opened by clicking "Material Library" in the header nav or mobile sidebar.
+         Users can view all built-in materials and add their own custom entries.
+         Custom materials are stored in CUSTOM_MATERIALS in script.js and also
+         injected into the main MATERIALS object so the simulator dropdown updates.
+    ═══════════════════════════════════════════════════════════════════════════ -->
+    <div id="matLibModal"
+         class="fixed inset-0 z-[200] hidden"
+         role="dialog"
+         aria-modal="true"
+         aria-label="Material Library">
+
+        <!-- Backdrop -->
+        <div id="matLibBackdrop"
+             class="absolute inset-0 bg-black/60 backdrop-blur-sm"
+             aria-hidden="true"></div>
+
+        <!-- Panel -->
+        <div id="matLibPanel"
+            class="absolute right-0 top-0 h-full w-full max-w-2xl bg-zinc-950
+                   border-l border-white/10 overflow-y-auto flex flex-col
+                   shadow-2xl shadow-black/60">
+
+            <!-- Header -->
+            <div class="flex items-center justify-between px-4 sm:px-8 py-4 sm:py-6
+                        border-b border-white/10 bg-zinc-950/80 sticky top-0 z-10 backdrop-blur-md">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined text-cyan-400">science</span>
+                    <h2 class="text-white font-['Space_Grotesk'] text-xl font-bold">Material Library</h2>
+                </div>
+                <button id="closeMatLibModal"
+                    class="text-zinc-500 hover:text-white transition-colors p-2
+                           hover:bg-white/5 rounded-lg"
+                    aria-label="Close material library">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+
+            <!-- Body -->
+            <div class="px-4 sm:px-8 py-6 space-y-6 sm:space-y-8 flex-grow">
+
+                <!-- ── Built-in Materials Table ───────────────────────── -->
+                <section>
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="material-symbols-outlined text-cyan-400 text-base">table_chart</span>
+                        <h3 class="text-white font-['Space_Grotesk'] text-lg font-semibold">
+                            Built-in Materials
+                        </h3>
+                        <span class="ml-auto text-[10px] font-mono-data text-zinc-600 uppercase tracking-widest">
+                            12 entries
+                        </span>
+                    </div>
+                    <div class="overflow-x-auto rounded-xl border border-white/10">
+                        <table class="w-full text-xs text-zinc-400 font-mono-data">
+                            <thead>
+                                <tr class="bg-surface-container text-zinc-500 text-[10px] uppercase tracking-widest">
+                                    <th class="text-left px-4 py-3">Material</th>
+                                    <th class="text-right px-4 py-3">Eg (eV)</th>
+                                    <th class="text-right px-4 py-3">Is</th>
+                                    <th class="text-right px-4 py-3">Vcut (V)</th>
+                                    <th class="text-right px-4 py-3">Vbr (V)</th>
+                                </tr>
+                            </thead>
+                            <!-- id="matLibBuiltinTable" — populated by JS from MATERIALS -->
+                            <tbody id="matLibBuiltinTable" class="divide-y divide-white/5"></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- ── Add Custom Material Form ───────────────────────── -->
+                <section>
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="material-symbols-outlined text-cyan-400 text-base">add_circle</span>
+                        <h3 class="text-white font-['Space_Grotesk'] text-lg font-semibold">
+                            Add Custom Material
+                        </h3>
+                    </div>
+
+                    <div class="glass-panel p-6 rounded-2xl space-y-5">
+                        <!-- Row 1: Name + Symbol -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                            <div class="space-y-1.5">
+                                <label class="text-[10px] font-label-caps text-zinc-400 uppercase"
+                                       for="cmName">Material Name</label>
+                                <input id="cmName" type="text"
+                                    placeholder="e.g. Gallium Arsenide"
+                                    class="w-full bg-surface-container-lowest border border-outline-variant
+                                           text-zinc-200 rounded-lg px-3 py-2.5 text-sm
+                                           focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400
+                                           transition-all placeholder-zinc-700">
+                            </div>
+                            <div class="space-y-1.5">
+                                <label class="text-[10px] font-label-caps text-zinc-400 uppercase"
+                                       for="cmSymbol">Chemical Symbol</label>
+                                <input id="cmSymbol" type="text"
+                                    placeholder="e.g. GaAs"
+                                    class="w-full bg-surface-container-lowest border border-outline-variant
+                                           text-zinc-200 rounded-lg px-3 py-2.5 text-sm
+                                           focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400
+                                           transition-all placeholder-zinc-700">
+                            </div>
+                        </div>
+
+                        <!-- Row 2: Eg + Vcut + Vbreak -->
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                            <div class="space-y-1.5">
+                                <label class="text-[10px] font-label-caps text-zinc-400 uppercase"
+                                       for="cmEg">Band Gap Eg (eV)</label>
+                                <input id="cmEg" type="number" step="0.01" min="0" max="10"
+                                    placeholder="e.g. 1.43"
+                                    class="w-full bg-surface-container-lowest border border-outline-variant
+                                           text-zinc-200 rounded-lg px-3 py-2.5 text-sm
+                                           focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400
+                                           transition-all placeholder-zinc-700">
+                            </div>
+                            <div class="space-y-1.5">
+                                <label class="text-[10px] font-label-caps text-zinc-400 uppercase"
+                                       for="cmVcut">Cut-in Voltage (V)</label>
+                                <input id="cmVcut" type="number" step="0.01" min="0" max="10"
+                                    placeholder="e.g. 1.20"
+                                    class="w-full bg-surface-container-lowest border border-outline-variant
+                                           text-zinc-200 rounded-lg px-3 py-2.5 text-sm
+                                           focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400
+                                           transition-all placeholder-zinc-700">
+                            </div>
+                            <div class="space-y-1.5">
+                                <label class="text-[10px] font-label-caps text-zinc-400 uppercase"
+                                       for="cmVbreak">Breakdown V (V)</label>
+                                <input id="cmVbreak" type="number" step="0.1" min="0" max="10"
+                                    placeholder="e.g. 1.8"
+                                    class="w-full bg-surface-container-lowest border border-outline-variant
+                                           text-zinc-200 rounded-lg px-3 py-2.5 text-sm
+                                           focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400
+                                           transition-all placeholder-zinc-700">
+                            </div>
+                        </div>
+
+                        <!-- Row 3: Is (mantissa + exponent split) + Color picker -->
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 items-end">
+                            <div class="space-y-1.5">
+                                <label class="text-[10px] font-label-caps text-zinc-400 uppercase"
+                                       for="cmIsMantissa">Is Mantissa (1–9.99)</label>
+                                <input id="cmIsMantissa" type="number" step="0.01" min="1" max="9.99"
+                                    placeholder="e.g. 1.00"
+                                    class="w-full bg-surface-container-lowest border border-outline-variant
+                                           text-zinc-200 rounded-lg px-3 py-2.5 text-sm
+                                           focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400
+                                           transition-all placeholder-zinc-700">
+                            </div>
+                            <div class="space-y-1.5">
+                                <label class="text-[10px] font-label-caps text-zinc-400 uppercase"
+                                       for="cmIsExponent">Is Exponent (×10^n)</label>
+                                <input id="cmIsExponent" type="number" step="1" min="-25" max="-1"
+                                    placeholder="e.g. -12"
+                                    class="w-full bg-surface-container-lowest border border-outline-variant
+                                           text-zinc-200 rounded-lg px-3 py-2.5 text-sm
+                                           focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400
+                                           transition-all placeholder-zinc-700">
+                            </div>
+                            <div class="space-y-1.5">
+                                <label class="text-[10px] font-label-caps text-zinc-400 uppercase"
+                                       for="cmColor">Curve Color</label>
+                                <div class="flex items-center gap-3">
+                                    <input id="cmColor" type="color" value="#00e5ff"
+                                           aria-label="Pick curve colour">
+                                    <span id="cmColorHex"
+                                          class="text-zinc-400 font-mono-data text-xs">#00e5ff</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Validation error message (hidden until needed) -->
+                        <p id="cmError"
+                           class="hidden text-red-400 text-xs font-mono-data bg-red-400/10
+                                  border border-red-400/20 rounded-lg px-3 py-2"
+                           role="alert" aria-live="assertive"></p>
+
+                        <!-- Submit button -->
+                        <button id="cmAddBtn"
+                            class="w-full py-3 bg-primary-container text-on-primary-fixed font-bold
+                                   rounded-xl hover:brightness-110 transition-all active:scale-[0.98]
+                                   shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2">
+                            <span class="material-symbols-outlined text-sm">add</span>
+                            Add to Material Database
+                        </button>
+                    </div>
+                </section>
+
+                <!-- ── Custom Materials Table ────────────────────────── -->
+                <section>
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="material-symbols-outlined text-cyan-400 text-base">category</span>
+                        <h3 class="text-white font-['Space_Grotesk'] text-lg font-semibold">
+                            Custom Materials
+                        </h3>
+                        <!-- id="customMatCount" — live count badge -->
+                        <span id="customMatCount"
+                              class="ml-auto text-[10px] font-mono-data text-zinc-600 uppercase tracking-widest">
+                            0 entries
+                        </span>
+                    </div>
+
+                    <!-- Placeholder when no custom materials exist yet -->
+                    <div id="customMatEmpty"
+                         class="text-center py-10 text-zinc-600 text-sm font-mono-data border border-dashed
+                                border-white/10 rounded-xl">
+                        No custom materials added yet.<br>
+                        <span class="text-xs text-zinc-700">Fill in the form above and click "Add to Material Database".</span>
+                    </div>
+
+                    <!-- Table — hidden until at least one custom material added -->
+                    <div id="customMatTableWrap" class="hidden overflow-x-auto rounded-xl border border-white/10">
+                        <table class="w-full text-xs text-zinc-400 font-mono-data">
+                            <thead>
+                                <tr class="bg-surface-container text-zinc-500 text-[10px] uppercase tracking-widest">
+                                    <th class="text-left px-4 py-3">Material</th>
+                                    <th class="text-right px-4 py-3">Eg (eV)</th>
+                                    <th class="text-right px-4 py-3">Is</th>
+                                    <th class="text-right px-4 py-3">Vcut (V)</th>
+                                    <th class="text-right px-4 py-3">Vbr (V)</th>
+                                    <th class="text-center px-4 py-3">Remove</th>
+                                </tr>
+                            </thead>
+                            <!-- id="customMatTableBody" — rows added dynamically -->
+                            <tbody id="customMatTableBody" class="divide-y divide-white/5"></tbody>
+                        </table>
+                    </div>
+                </section>
+
+            </div><!-- /modal body -->
+
+            <!-- Footer -->
+            <div class="px-4 sm:px-8 py-4 border-t border-white/10 flex items-center
+                        justify-between bg-zinc-950/80 gap-4">
+                <span class="text-zinc-600 text-xs font-mono-data">
+                    Custom materials are added to the simulator dropdown instantly.
+                </span>
+                <button id="closeMatLibModal2"
+                    class="text-cyan-400 text-xs font-bold uppercase tracking-widest
+                           hover:text-cyan-300 transition-colors">
+                    Close
+                </button>
+            </div>
+
+        </div><!-- /matLibPanel -->
+    </div><!-- /matLibModal -->
+
+
+    <div id="toast" role="status" aria-live="polite"></div>
+
+
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         FOOTER — Fixed bottom bar
+    ═══════════════════════════════════════════════════════════════════════════ -->
+    <footer class="flex justify-between items-center px-3 sm:px-6 py-3 sm:py-4 fixed bottom-0 w-full
+                   ml-0 md:ml-64 bg-zinc-950 border-t border-white/5 z-40">
+        <div class="flex items-center gap-2 sm:gap-4 min-w-0">
+            <span class="text-cyan-400 font-bold font-['Space_Grotesk'] text-[9px] sm:text-[10px]
+                         uppercase tracking-widest truncate">
+                <span class="hidden xs:inline">&copy; 2026 </span>Asmita Yadav
+                <span class="hidden sm:inline">&nbsp;|&nbsp; CSE-H &nbsp;|&nbsp; RA2511003050539</span>
+            </span>
+            <span class="hidden md:inline text-zinc-700" aria-hidden="true">|</span>
+            <span class="hidden md:inline text-zinc-600 font-['Space_Grotesk'] text-[10px] uppercase tracking-widest">
+                High-Precision Engine
+            </span>
+        </div>
+        <!-- Footer right: Documentation only -->
+        <div class="flex gap-4 flex-shrink-0">
+            <a id="docLinkFooter"
+               class="text-zinc-500 hover:text-cyan-400 font-['Space_Grotesk'] text-[10px]
+                      uppercase tracking-widest transition-colors cursor-pointer flex items-center gap-1"
+               href="#" role="button" aria-haspopup="dialog">
+                <span class="material-symbols-outlined" style="font-size:13px;">menu_book</span>
+                <span class="hidden sm:inline">Documentation</span>
+            </a>
+        </div>
+    </footer>
+
+
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         SCRIPT — loaded with defer so it runs after DOM is fully parsed.
+         All simulator logic lives in script.js.
+    ═══════════════════════════════════════════════════════════════════════════ -->
+    <script src="script.js" defer></script>
+
+</body>
+</html>

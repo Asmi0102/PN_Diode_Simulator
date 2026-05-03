@@ -1,0 +1,379 @@
+/* =============================================================================
+   PN-Sim v2.0 | styles.css
+   All custom CSS for the PN Junction Diode Simulator.
+   Tailwind handles utility classes; this file covers:
+     - Custom component styles (glass panel, glow effects)
+     - Range input cross-browser styling
+     - Documentation modal animation
+     - Scrollbar theming
+     - Material badge transitions
+     - Print styles
+   ============================================================================= */
+
+
+/* ── 1. MATERIAL SYMBOLS ICON FONT ─────────────────────────────────────────── */
+.material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+
+/* ── 2. GLASS MORPHISM PANEL ────────────────────────────────────────────────── */
+/*
+   Used on all card-style containers throughout the layout.
+   Combines translucent background + backdrop blur + subtle border.
+*/
+.glass-panel {
+    background: rgba(26, 26, 28, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px); /* Safari support */
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Soft cyan glow applied to the main simulation controls card */
+.glow-cyan {
+    box-shadow: 0 0 32px rgba(0, 229, 255, 0.15);
+}
+
+
+/* ── 3. RANGE SLIDER — WEBKIT ───────────────────────────────────────────────── */
+/*
+   Override default OS-level range appearance for a consistent dark-theme look.
+*/
+input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    width: 100%;
+    cursor: pointer;
+}
+
+/* Track — the horizontal rail the thumb slides along */
+input[type="range"]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 4px;
+    background: #3b494c;
+    border-radius: 2px;
+}
+
+/* Thumb — the draggable circle */
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 16px;
+    width: 16px;
+    border-radius: 50%;
+    background: #00e5ff;
+    margin-top: -6px;     /* vertically centre on track */
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(0, 229, 255, 0.5);
+    transition: box-shadow 0.2s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+    box-shadow: 0 0 18px rgba(0, 229, 255, 0.85);
+}
+
+/* Firefox — track */
+input[type="range"]::-moz-range-track {
+    width: 100%;
+    height: 4px;
+    background: #3b494c;
+    border-radius: 2px;
+    border: none;
+}
+
+/* Firefox — thumb */
+input[type="range"]::-moz-range-thumb {
+    height: 16px;
+    width: 16px;
+    border-radius: 50%;
+    background: #00e5ff;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(0, 229, 255, 0.5);
+    transition: box-shadow 0.2s ease;
+}
+
+input[type="range"]::-moz-range-thumb:hover {
+    box-shadow: 0 0 18px rgba(0, 229, 255, 0.85);
+}
+
+
+/* ── 4. DOCUMENTATION MODAL ─────────────────────────────────────────────────── */
+/*
+   The modal overlay sits hidden (display:none via .hidden class).
+   The inner panel slides in from the right edge using a CSS transform.
+   JavaScript adds/removes the .open class to trigger the animation.
+*/
+#docModal {
+    transition: opacity 0.3s ease;
+}
+
+/* Tailwind's .hidden utility sets display:none; override when open */
+#docModal.hidden {
+    display: none !important;
+}
+
+/* Start off-screen to the right */
+#docPanel {
+    transform: translateX(100%);
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Slide into view when the parent modal has .open class */
+#docModal.open #docPanel {
+    transform: translateX(0);
+}
+
+
+/* ── 5. SCROLLBAR THEMING ───────────────────────────────────────────────────── */
+/*
+   Narrow, dark scrollbar that matches the zinc-950 background theme.
+   Only applies in WebKit/Blink engines (Chrome, Edge, Safari).
+*/
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #0e0e0e;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #3b494c;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 229, 255, 0.33);
+}
+
+
+/* ── 6. MATERIAL BADGE ──────────────────────────────────────────────────────── */
+/*
+   The small colored pill below the material dropdown.
+   JS updates background/border/color on every material change.
+   This class provides smooth colour transition.
+*/
+.mat-badge {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+
+/* ── 7. CHART CANVAS CONTAINER ──────────────────────────────────────────────── */
+/*
+   Ensures the Chart.js <canvas> fills its flex-grow parent div
+   without fighting aspect-ratio defaults.
+*/
+.chart-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: 0; /* allow flex children to shrink */
+}
+
+.chart-container canvas {
+    position: absolute;
+    inset: 0;
+    width: 100% !important;
+    height: 100% !important;
+}
+
+
+/* ── 8. TOAST NOTIFICATION ──────────────────────────────────────────────────── */
+/*
+   Small bottom-right feedback toast shown after export actions.
+   JS adds/removes .show to trigger the fade + slide animation.
+*/
+#toast {
+    position: fixed;
+    bottom: 80px;         /* just above the fixed footer */
+    right: 24px;
+    z-index: 9999;
+    background: rgba(0, 229, 255, 0.12);
+    border: 1px solid rgba(0, 229, 255, 0.3);
+    color: #00e5ff;
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-family: monospace;
+    letter-spacing: 0.05em;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+#toast.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+
+/* ── 9. MOBILE SIDEBAR ──────────────────────────────────────────────────────── */
+/*
+   Hidden off-screen to the left on mobile. JS adds/removes .open to slide in.
+   The backdrop sits behind the panel and covers the rest of the screen.
+*/
+#mobileSidebar {
+    transform: translateX(-100%);
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#mobileSidebar.open {
+    transform: translateX(0);
+}
+
+#mobileSidebarOverlay {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+#mobileSidebarOverlay.open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+
+/* ── 10. MATERIAL LIBRARY MODAL ─────────────────────────────────────────────── */
+/*
+   Slide-in panel from the right, same pattern as the doc modal.
+   JS adds/removes .open class on #matLibModal.
+*/
+#matLibModal {
+    transition: opacity 0.3s ease;
+}
+
+#matLibModal.hidden {
+    display: none !important;
+}
+
+#matLibPanel {
+    transform: translateX(100%);
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#matLibModal.open #matLibPanel {
+    transform: translateX(0);
+}
+
+/* Color picker — style the native input to match dark theme */
+input[type="color"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 40px;
+    height: 40px;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+    background: transparent;
+    cursor: pointer;
+    padding: 2px;
+}
+
+input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+input[type="color"]::-webkit-color-swatch { border: none; border-radius: 6px; }
+
+
+/* ── 12. RESPONSIVE BREAKPOINT OVERRIDES ────────────────────────────────────── */
+
+/*
+   Extra-small screens (< 360px): tighten glass panel padding so nothing clips.
+   Tailwind's smallest breakpoint is 'sm' = 640px, so we handle sub-640px here.
+*/
+@media (max-width: 639px) {
+
+    /* Controls card inner padding — tighter on mobile */
+    .glass-panel {
+        padding: 1rem;         /* 16px instead of 24px */
+    }
+
+    /* Override only the controls + chart panels back to normal padding
+       so the card chrome doesn't feel too cramped */
+    .glass-panel.glow-cyan {
+        padding: 1.25rem;
+    }
+
+    /* Chart canvas container: enforce minimum so chart stays readable */
+    .chart-container {
+        min-height: 200px;
+    }
+
+    /* Slider labels: slightly smaller */
+    input[type="range"]::-webkit-slider-thumb {
+        height: 14px;
+        width:  14px;
+    }
+
+    /* Graph summary stat cells: reduce inner padding */
+    .glass-panel .bg-surface-container-low {
+        padding: 0.5rem;
+    }
+}
+
+/*
+   Medium screens (640px – 1023px): two-column layout kicks in at md (768px).
+   Ensure modals don't overflow.
+*/
+@media (max-width: 767px) {
+
+    /* Modals take full viewport width on small screens */
+    #docPanel,
+    #matLibPanel {
+        max-width: 100vw;
+    }
+
+    /* Mobile sidebar: slightly narrower on very small screens */
+    #mobileSidebar {
+        width: 85vw;
+        max-width: 300px;
+    }
+}
+
+/*
+   Large screens (1280px+): give the chart extra breathing room.
+*/
+@media (min-width: 1280px) {
+    .chart-container {
+        min-height: 380px;
+    }
+}
+
+
+/* ── 13. PRINT STYLES ────────────────────────────────────────────────────────── */
+/*
+   When the user triggers PDF export (window.print()):
+   - Hide chrome (sidebar, header, footer, modal, export buttons)
+   - Remove the left margin used to offset the sidebar
+   - Show only the main chart + info cards
+*/
+@media print {
+    aside,
+    header,
+    footer,
+    #docModal,
+    #exportDataBtn,
+    #resetBtn,
+    #pdfExportBtn,
+    #csvExportBtn,
+    #zoomInBtn,
+    #toggleGridBtn {
+        display: none !important;
+    }
+
+    main {
+        margin-left: 0 !important;
+        padding-top: 1rem !important;
+        padding-bottom: 0 !important;
+    }
+
+    .glass-panel {
+        border: 1px solid #ccc;
+        background: #fff;
+    }
+
+    body {
+        background: #fff !important;
+        color: #111 !important;
+    }
+}
